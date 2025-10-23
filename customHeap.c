@@ -5,8 +5,8 @@
 const int NUMBER_OF_CHUNKS = 9;
 int *isUsed;                // array of if each chunk is used, 
 // 0 - unused, 1 - used and has internal fragmentation, 2 - completely used
-int **basePointersArray;  // array of pointers that keeps track of the base pointer for each chunk
-int **endPointersArray;   // array of pointers that keeps track of the end pointer for each chunk `
+char **basePointersArray;  // array of pointers that keeps track of the base pointer for each chunk
+char **endPointersArray;   // array of pointers that keeps track of the end pointer for each chunk `
 
 typedef struct {
     char name[5];         // p0, p1,....,pn-1
@@ -14,8 +14,8 @@ typedef struct {
     int allocatedChunk;   // which chunk it was allocated to, set to -1 if not allocated)
 } Process;
 
-void split_chunks(int, int*);
-void freeInitialHeap(int *basePointer);
+void split_chunks(int, char*);
+void freeInitialHeap(char*);
 void processInput(Process *processes, int *processCount, int heapSize);
 void resetIsUsed();
 void firstFit(Process *processes, int numProcesses, int *chunkSizes);
@@ -41,36 +41,36 @@ int main()
     for(int i=0;i<NUMBER_OF_CHUNKS;i++){isUsed[i] = 0;}
 
     // allocating the initial heap
-    int *basePointer = malloc((n * sizeof(int)));
+    char *basePointer = malloc((n * sizeof(char)));
     printf("base pointer of entire heap: %p\n", basePointer);   // start of our allocated heap
     printf("last pointer of entire heap: %p\n", basePointer+(n-1));    // end of our allocated heap   
     printf("\n");
 
-    basePointersArray = malloc(NUMBER_OF_CHUNKS * sizeof(int*));
-    endPointersArray = malloc(NUMBER_OF_CHUNKS * sizeof(int*));
+    basePointersArray = malloc(NUMBER_OF_CHUNKS * sizeof(char*));
+    endPointersArray = malloc(NUMBER_OF_CHUNKS * sizeof(char*));
     split_chunks(n, basePointer);
 
     // process input
     Process processes[20];
     int numProcesses;
-    takeProcessInput(processes, &numProcesses, n);
+    // takeProcessInput(processes, &numProcesses, n);
 
     // run algorithms one by one with pause
-    printf("\nPress Enter to compare all algorithms...");
-    getchar(); // consume leftover newline from scanf
-    getchar(); // wait for user
+    // printf("\nPress Enter to compare all algorithms...");
+    //getchar(); // consume leftover newline from scanf
+    //getchar(); // wait for user
 
     int chunkSizes[] = {n / 2, n/4, n/8, n/16, n/32, n/64, n/128, n/256, n/256};
-    compareAlgorithms(processes, numProcesses, chunkSizes, n);
+    // compareAlgorithms(processes, numProcesses, chunkSizes, n);
 
     // cleanup
-    freeUpInitialHeap(basePointer);
+    freeInitialHeap(basePointer);
     free(isUsed);
     free(basePointersArray);
     free(endPointersArray);
     
 }
-void split_chunks(int heapSize, int *basePointer)
+void split_chunks(int heapSize, char *basePointer)
 {
     // if for example heapSize is 1024 then chunk sizes would be
     // 1024  =   512     256     128     64      32      16      8       4       4
@@ -87,17 +87,18 @@ void split_chunks(int heapSize, int *basePointer)
         basePointersArray[i] = endPointersArray[i-1] + 1;
         endPointersArray[i] = basePointersArray[i] + (sizes[i] - 1);
     }
+    // PRINTING THE CHUNK BASE AND END POINTER LOOP COMMENT OUT IF DEBUGGING
     // printing the chunk intiial and final addresses
-    for(int i=0;i<NUMBER_OF_CHUNKS; i++)
-    {
-        printf("base pointer for %dth chunk: ", i);
-        printf("%p\n", basePointersArray[i]);
-        printf("end pointer for %dth chunk: ", i);
-        printf("%p\n", endPointersArray[i]);
-        printf("\n");
-    }
+    // for(int i=0;i<NUMBER_OF_CHUNKS; i++)
+    // {
+        // printf("base pointer for %dth chunk: ", i);
+        // printf("%p\n", basePointersArray[i]);
+        // printf("end pointer for %dth chunk: ", i);
+        // printf("%p\n", endPointersArray[i]);
+        // printf("\n");
+    // }
 }
-void freeUpInitialHeap(int *basePointer)
+void freeInitialHeap(char *basePointer)
 {
     free(basePointer);
     basePointer = NULL;
@@ -259,3 +260,32 @@ void compareAlgorithms(Process *originalProcesses, int numProcesses, int *chunkS
     else
         printf("Best algorithm: Worst Fit with (%.2f%% utilization)\n", wfUtil);
 }
+
+void useFirstFit(Process process)
+{
+    
+}
+/*
+
+enter proces number:0
+enter process size:100
+
+first
+best
+worst
+
+
+txt file that has the heap 
+
+3 files for 
+first
+best
+worst
+
+ansfirst
+ansbest
+answorst
+
+
+
+*/
