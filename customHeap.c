@@ -81,6 +81,7 @@ int main()
         printf("1 - allocate process\n");
         printf("2 - free up process\n");
         printf("3 - View Remaining Space \n");
+        printf("4 - View Process Details \n");
         printf("Enter choice: ");
         scanf("%d", &choice);
         
@@ -140,9 +141,19 @@ int main()
                 printf("\n\n--------SPACE LEFT IN CHUNKS DONE---------\n\n");
                 break;
             }
-            
+            case 4:
+            {
+                printf("\nProcess Details:\n");
+                for(int i=0;i<=count;i++)
+                {
+                    printf("Process Name: P%d\n", processes[i].id);
+                    printf("Process Size: %d\n", processes[i].size);
+                    printf("Allocated Chunk of this process: %d\n\n", processes[i].allocatedChunk);
+                }
+                break;
+            }
             case 100:
-                for(int i=0;i<5;i++)
+                for(int i=0;i<=count;i++)
                 {
                     printf("\n\nid: %d", processes[i].id);
                     printf("\nallocated chunk: %d", processes[i].allocatedChunk);
