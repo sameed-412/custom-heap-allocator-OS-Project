@@ -16,21 +16,21 @@ typedef struct {
     int allocatedChunk;   // which chunk it was allocated to, set to -1 if not allocated)
 } Process;
 Process *processes;
-int counte=0;
+
 // 0,1 ,2,3
 // free up 3
-int count = 0;
+int count = -1;
 
 void split_chunks(int, char*);
 void freeInitialHeap(char*);
 void processInput(Process *processes, int *processCount, int heapSize);
 void resetIsUsed();
-void firstFit(Process *process, int numProcesses, int *chunkSizes);
-void bestFit(Process *processes, int numProcesses, int *chunkSizes);
+void firstFit(Process process, int numProcesses, int *chunkSizes);
+void bestFit(Process process, int numProcesses, int *chunkSizes);
 void worstFit(Process *processes, int numProcesses, int *chunkSizes);
 float calculateUtilization(Process *processes, int numProcesses, int heapSize);
 void compareAlgorithms(Process *originalProcesses, int numProcesses, int *chunkSizes, int heapSize);
-void useFirstFit(Process*, int*);
+void useFirstFit(Process, int*);
 void useWorstFit(Process, int*);
 void useBestFit(Process, int*);
 void customFree(int);
@@ -77,38 +77,44 @@ int main()
         int choice;
         int processNumber;
         int processSize;
-        printf("\n\n1 - allocate process\n");
+        printf("\n\n0 - Exit\n");
+        printf("1 - allocate process\n");
         printf("2 - free up process\n");
         printf("3 - View Remaining Space \n");
-        printf("4 - Exit\n");
         printf("Enter choice: ");
         scanf("%d", &choice);
         
         //switch case
         switch (choice)
         {
+            case 0:
+            {
+                exit(0);
+                running = 0;
+                break;
+            }
             // for allocation of the process
             case 1:
                 // process input
-                printf("Enter size for process P%d: ", count);
+                printf("Enter size for process P%d: ", (count+1));
                 scanf("%d", &processSize);
                 Process p;
+                count += 1;
                 p.id = count;
                 p.size = processSize;
                 p.allocatedChunk = -1; // by default the process has no allocated chunk
                 processes[count].id = p.id; 
                 processes[count].size = p.size; 
-                count += 1;
-                printf("\nnew count: %d\n", count);
+                // printf("\nnew count: %d\n", count);
                 if (p.size > n/2)
                 {
                     printf("\nThis process is too large to be allocated\n");
                     break;
                 }
                 // allocate logic here, call the required functions
-                useFirstFit(&p, chunkSizes);
+                // useFirstFit(p, chunkSizes);
+                useBestFit(p, chunkSizes);
                 // useWorstFit(p, chunkSizes);
-                // useBestFit(p, chunkSizes);
                 printf("\n--------PRINTING THE SPACE LEFT IN CHUNKS FOR DEBUG---------\n");
                 for(int i=0;i<NUMBER_OF_CHUNKS;i++)
                 {
@@ -118,11 +124,14 @@ int main()
                 break;
             // for freeing up the process
             case 2:
+            {
                 printf("process number that is to be freed: ");
                 scanf("%d", &processNumber);
                 customFree(processNumber);
                 break;
+            }
             case 3:
+            {
                 printf("\n--------PRINTING THE SPACE LEFT IN CHUNKS FOR DEBUG---------\n");
                 for(int i=0;i<NUMBER_OF_CHUNKS;i++)
                 {
@@ -130,10 +139,8 @@ int main()
                 }
                 printf("\n\n--------SPACE LEFT IN CHUNKS DONE---------\n\n");
                 break;
-            case 4:
-                exit(0);
-                running = 0;
-                break;
+            }
+            
             case 100:
                 for(int i=0;i<5;i++)
                 {
@@ -215,7 +222,7 @@ void resetIsUsed()
     for(int i = 0; i < NUMBER_OF_CHUNKS; i++)
         isUsed[i] = 0;
 }
-void firstFit(Process *process, int numProcesses, int *chunkSizes)
+void firstFit(Process process, int numProcesses, int *chunkSizes)
 {
     // dont need to check for process larger than chunk size as its being handled above
     int allocated = 0;      // flag to detemrine if the process was allocated or no
@@ -226,83 +233,56 @@ void firstFit(Process *process, int numProcesses, int *chunkSizes)
         // p.chunk = i
         // spaceLeftInChunks[i]-=p.size
         // if the process requires space less than the entire chunk, set isused to 1
-       if(spaceLeftInChunks[i]>=process->size && process->size < chunkSizes[i])
+       if(spaceLeftInChunks[i]>=process.size && process.size < chunkSizes[i])
         {
             isUsed[i] = 1;
-            spaceLeftInChunks[i] -= process->size;
-            process->allocatedChunk = i;
+            spaceLeftInChunks[i] -= process.size;
+            process.allocatedChunk = i;
             allocated = 1;
-            printf("\nallocated to block %d\n", process->allocatedChunk);
-            processes[count-1].allocatedChunk = process->allocatedChunk; 
-            // printf("%s allocated to chunk %d (size %d)\n", processes[i]->name, i, chunkSizes[i]);
+            printf("\nallocated to block %d\n", process.allocatedChunk);
+            processes[count].allocatedChunk = process.allocatedChunk; 
+            // printf("%s allocated to chunk %d (size %d)\n", processes[i].name, i, chunkSizes[i]);
             break;
         } 
         // if the process requires the same amount of space as the entire chunk, set isused to 2
-        else if(spaceLeftInChunks[i] >= process->size && process->size == chunkSizes[i])
+        else if(spaceLeftInChunks[i] >= process.size && process.size == chunkSizes[i])
         {
             isUsed[i] = 2;
-            spaceLeftInChunks[i] -= process->size;
-            process->allocatedChunk = i;
-            printf("\nallocated to block %d\n", process->allocatedChunk);
-            processes[count-1].allocatedChunk = process->allocatedChunk; 
+            spaceLeftInChunks[i] -= process.size;
+            process.allocatedChunk = i;
+            printf("\nallocated to block %d\n", process.allocatedChunk);
+            processes[count].allocatedChunk = process.allocatedChunk; 
             allocated = 1;
             break;
         }
     }
     if(!allocated)
     {
-        printf("Process P%d could not be allocated, shortage of space ", process->id);
+        printf("Process P%d could not be allocated, shortage of space ", process.id);
     }
-
-    // for(int i = 0; i < numProcesses; i++)
-    // {
-    //     if(processes[i].allocatedChunk == -2) continue; // if the process is too large, then skip it
-
-    //     int allocated = 0; // flag to detemrine if the process was allocated or no
-    //     for(int j = 0; j < NUMBER_OF_CHUNKS; j++)
-    //     {
-    //         if(isUsed[j] == 0 && processes[i].size <= chunkSizes[j])
-    //         {
-    //             isUsed[j] = 1;
-    //             processes[i].allocatedChunk = j;
-    //             allocated = 1;
-    //             printf("%s allocated to chunk %d (size %d)\n", processes[i].name, j, chunkSizes[j]);
-    //             break;
-    //         }
-    //     }
-    //     if(!allocated)
-    //         printf("%s could not be allocated.\n", processes[i].name);
-    // }
 }
-void bestFit(Process *processes, int numProcesses, int *chunkSizes)
+void bestFit(Process process, int numProcesses, int *chunkSizes)
 {
-    printf("\n\n\tBest Fit Allocation\n");
-    resetIsUsed();
-
-    for(int i = 0; i < numProcesses; i++)
+    int bestIndex = -1;
+    int bestSize = INT_MAX;
+    for(int i=0;i<NUMBER_OF_CHUNKS;i++)
     {
-        if(processes[i].allocatedChunk == -2) continue;
-
-        int bestIndex = -1;
-        int bestSize = INT_MAX;
-        for(int j = 0; j < NUMBER_OF_CHUNKS; j++)   // loop to find the best chunk to allocate the process in
+        if(process.size <= spaceLeftInChunks[i] && process.size <= chunkSizes[i] && chunkSizes[i] < bestSize)
         {
-            if(isUsed[j] == 0 && processes[i].size <= chunkSizes[j] && chunkSizes[j] < bestSize)
-            {
-                bestSize = chunkSizes[j];
-                bestIndex = j;
-            }
+            bestSize = spaceLeftInChunks[i];
+            bestIndex = i;
         }
-        if(bestIndex != -1)
-        {
-            isUsed[bestIndex] = 1;
-            processes[i].allocatedChunk = bestIndex;
-            printf("%s allocated to chunk %d (size %d)\n", processes[i].id, bestIndex, chunkSizes[bestIndex]);
-        }
-        else
-        {
-            printf("%s could not be allocated.\n", processes[i].id);
-        }
+    }
+    if(bestIndex != -1)
+    {
+        process.allocatedChunk = bestIndex;
+        spaceLeftInChunks[bestIndex] -= process.size;
+        processes[count].allocatedChunk = process.allocatedChunk; 
+        printf("\nallocated to block %d\n", process.allocatedChunk);
+    }
+    else
+    {
+        printf("Process P%d could not be allocated, shortage of space", process.id);
     }
 }
 void worstFit(Process *processes, int numProcesses, int *chunkSizes)
@@ -352,15 +332,15 @@ float calculateUtilization(Process *processes, int numProcesses, int heapSize)
 }
 
 
-void useFirstFit(Process *process, int *chunkSizes)
+void useFirstFit(Process process, int *chunkSizes)
 {
     firstFit(process, 1, chunkSizes);
 }
-void useWorstFit(Process process, int *chunkSizes)
-{
-    // call function here
-}
 void useBestFit(Process process, int *chunkSizes)
+{
+    bestFit(process, 1, chunkSizes);
+}
+void useWorstFit(Process process, int *chunkSizes)
 {
     // call function here
 }
