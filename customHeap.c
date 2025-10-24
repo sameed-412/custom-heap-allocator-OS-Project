@@ -6,34 +6,52 @@ const int NUMBER_OF_CHUNKS = 9;
 const int MAX_PROCESSES = 100;
 int *isUsed;                // array of if each chunk is used, 
 // 0 - unused, 1 - used and has internal fragmentation, 2 - completely used
-char **basePointersArray;  // array of pointers that keeps track of the base pointer for each chunk
-char **endPointersArray;   // array of pointers that keeps track of the end pointer for each chunk `
+int **basePointersArray;  // array of pointers that keeps track of the base pointer for each chunk
+int **endPointersArray;   // array of pointers that keeps track of the end pointer for each chunk `
 int *spaceLeftInChunks;
-
+/*
+TODO
+1. calculate internal, external and total fragmentation for each algorithm
+2. write the process number(p0 would be 0) to the actual memory of the block it was assigned to
+3. write the answers to text files
+4. make sure that freeing up rewrites the actual memory to be -1 or some other flag
+5. make sure that freeing up also rewrites the text files to be correct
+6. text files can be done last and if too complicated, just scrap it/do it in python/do it using ai
+*/
+// Process data type
 typedef struct {
     int id;
-    int size;             
+    int size;
     int allocatedChunk;   // which chunk it was allocated to, set to -1 if not allocated)
+    int firstChunk, bestChunk, worstChunk;
 } Process;
 Process *processes;
 
-// 0,1 ,2,3
-// free up 3
+// heapState data type for each algorithm used
+typedef struct{
+    int *isUsed;
+    int *spaceLeftInChunks;
+} heapState;
+heapState firstFitHeap, bestFitHeap, worstFitHeap;
+
+// the Process Name
 int count = -1;
 
-void split_chunks(int, char*);
-void freeInitialHeap(char*);
-void processInput(Process *processes, int *processCount, int heapSize);
-void resetIsUsed();
-void firstFit(Process process, int numProcesses, int *chunkSizes);
-void bestFit(Process process, int numProcesses, int *chunkSizes);
-void worstFit(Process *processes, int numProcesses, int *chunkSizes);
-float calculateUtilization(Process *processes, int numProcesses, int heapSize);
-void compareAlgorithms(Process *originalProcesses, int numProcesses, int *chunkSizes, int heapSize);
-void useFirstFit(Process, int*);
-void useWorstFit(Process, int*);
-void useBestFit(Process, int*);
-void customFree(int);
+void split_chunks(int, int*);  // splits the initial heap into chunks
+void freeInitialHeap(int*);    // frees up the initial allocated heap
+void processInput(Process *processes, int *processCount, int heapSize); // not used function delete if still not used at the end
+void resetIsUsed(heapState*); // resets the isused array for each heapstate
+float calculateUtilization(Process *processes, int numProcesses, int heapSize); // rewrite this function
+void compareAlgorithms(Process *originalProcesses, int numProcesses, int *chunkSizes, int heapSize);    // rewrite this function
+void firstFit(Process process, int *chunkSizes, heapState); // accepts the process and the chunksizes
+void useFirstFit(Process, int*, heapState); // accepts the process, chunksizes, and its heapstate
+void bestFit(Process process, int *chunkSizes, heapState); // accepts the process and the chunksizes
+void useBestFit(Process, int*, heapState);  // accepts the process, chunksizes, and its heapstate
+void worstFit(Process process, int *chunkSizes, heapState);    // accepts the process and the chunksizes
+void useWorstFit(Process, int*, heapState); // accepts the process, chunksizes, and its heapstate
+void customFree(int, heapState*);   // accepts the id of the process to be deleted and the heapstate it belongs to
+void initializeHeapStates(heapState*, int*);    // isused and spaceleftinchunks array initialised for each heapstate
+void displayChunks(heapState);
 // min allocation 1024
 // 1048576   512k   256k    128k    64k     32k       
 // 1024  =   512     256     128     64      32      16      8       4       4
@@ -50,11 +68,11 @@ int main()
     for(int i=0;i<NUMBER_OF_CHUNKS;i++){isUsed[i] = 0;}
 
     // allocating the initial heap
-    char *basePointer = malloc((n * sizeof(char)));
+    int *basePointer = malloc((n * sizeof(int)));
     
 
-    basePointersArray = malloc(NUMBER_OF_CHUNKS * sizeof(char*));
-    endPointersArray = malloc(NUMBER_OF_CHUNKS * sizeof(char*));
+    basePointersArray = malloc(NUMBER_OF_CHUNKS * sizeof(int*));
+    endPointersArray = malloc(NUMBER_OF_CHUNKS * sizeof(int*));
     split_chunks(n, basePointer);
 
     processes = malloc(sizeof(Process) * MAX_PROCESSES);
@@ -69,6 +87,9 @@ int main()
 
     // compareAlgorithms(processes, numProcesses, chunkSizes, n);
 
+    initializeHeapStates(&firstFitHeap, chunkSizes);
+    initializeHeapStates(&bestFitHeap, chunkSizes);
+    initializeHeapStates(&worstFitHeap, chunkSizes);
     // main loop
     int running = 1;
     while(running)
@@ -80,8 +101,8 @@ int main()
         printf("\n\n0 - Exit\n");
         printf("1 - allocate process\n");
         printf("2 - free up process\n");
-        printf("3 - View Remaining Space \n");
-        printf("4 - View Process Details \n");
+        printf("3 - View Process Details \n");
+        printf("4 - View Remaining Space \n\n");
         printf("Enter choice: ");
         scanf("%d", &choice);
         
@@ -113,57 +134,74 @@ int main()
                     break;
                 }
                 // allocate logic here, call the required functions
-                // useFirstFit(p, chunkSizes);
-                useBestFit(p, chunkSizes);
-                // useWorstFit(p, chunkSizes);
-                printf("\n--------PRINTING THE SPACE LEFT IN CHUNKS FOR DEBUG---------\n");
-                for(int i=0;i<NUMBER_OF_CHUNKS;i++)
-                {
-                    printf("\nspaceleftinchunks[%d]: %d", i, spaceLeftInChunks[i]);
-                }
-                printf("\n\n--------SPACE LEFT IN CHUNKS DONE---------\n\n");
+                useFirstFit(p, chunkSizes, firstFitHeap);
+                useBestFit(p, chunkSizes, bestFitHeap);
+                useWorstFit(p, chunkSizes, worstFitHeap);
                 break;
             // for freeing up the process
             case 2:
             {
                 printf("process number that is to be freed: ");
                 scanf("%d", &processNumber);
-                customFree(processNumber);
+                customFree(processNumber, &firstFitHeap);
+                customFree(processNumber, &worstFitHeap);
+                customFree(processNumber, &bestFitHeap);
                 break;
             }
+            // process details
             case 3:
-            {
-                printf("\n--------PRINTING THE SPACE LEFT IN CHUNKS FOR DEBUG---------\n");
-                for(int i=0;i<NUMBER_OF_CHUNKS;i++)
-                {
-                    printf("\nspaceleftinchunks[%d]: %d", i, spaceLeftInChunks[i]);
-                }
-                printf("\n\n--------SPACE LEFT IN CHUNKS DONE---------\n\n");
-                break;
-            }
-            case 4:
             {
                 printf("\nProcess Details:\n");
                 for(int i=0;i<=count;i++)
                 {
+                    if(processes[i].id == -1)
+                    {
+                        printf("Process P%d was freed up\n", i);
+                        printf("It occupied a space of: %d\n\n", processes[i].size);
+                        continue;
+                    }
                     printf("Process Name: P%d\n", processes[i].id);
                     printf("Process Size: %d\n", processes[i].size);
-                    printf("Allocated Chunk of this process: %d\n\n", processes[i].allocatedChunk);
+                    printf("Allocated Chunks of this process\n", processes[i].allocatedChunk);
+                    printf("Best Chunk: %d\n", processes[i].bestChunk);
+                    printf("First Chunk: %d\n", processes[i].firstChunk);
+                    printf("Worst Chunk: %d\n\n", processes[i].worstChunk);
                 }
                 break;
             }
+            // space left in chunks
+            case 4:
+            {
+                printf("\n\nFirst fit heap");
+                displayChunks(firstFitHeap);
+                printf("\n\nbest fit heap");
+                displayChunks(bestFitHeap);
+                printf("\n\nworst fit heap");
+                displayChunks(worstFitHeap);
+                break;
+            }
+            case 10:
+                split_chunks(n, basePointer);
+                break;
             case 100:
+            {
                 for(int i=0;i<=count;i++)
                 {
                     printf("\n\nid: %d", processes[i].id);
-                    printf("\nallocated chunk: %d", processes[i].allocatedChunk);
+                    printf("\nAllocated Chunks of this process\n", processes[i].allocatedChunk);
+                    printf("Best Chunk: %d\n", processes[i].bestChunk);
+                    printf("First Chunk: %d\n", processes[i].firstChunk);
+                    printf("Worst Chunk: %d\n", processes[i].worstChunk);
                     printf("\nsize: %d", processes[i].size);
                     printf("\n\n");
                 }
                 break;
+            }
             default:
+            {
                 printf("\nError! Invalid choice\n");
                 break;
+            }
         }
     }
     // cleanup
@@ -173,7 +211,7 @@ int main()
     free(endPointersArray);
     
 }
-void split_chunks(int heapSize, char *basePointer)
+void split_chunks(int heapSize, int *basePointer)
 {
     // if for example heapSize is 1024 then chunk sizes would be
     // 1024  =   512     256     128     64      32      16      8       4       4
@@ -190,18 +228,8 @@ void split_chunks(int heapSize, char *basePointer)
         basePointersArray[i] = endPointersArray[i-1] + 1;
         endPointersArray[i] = basePointersArray[i] + (sizes[i] - 1);
     }
-    // PRINTING THE CHUNK BASE AND END POINTER LOOP COMMENT OUT IF DEBUGGING
-    // printing the chunk intiial and final addresses
-    // for(int i=0;i<NUMBER_OF_CHUNKS; i++)
-    // {
-        // printf("base pointer for %dth chunk: ", i);
-        // printf("%p\n", basePointersArray[i]);
-        // printf("end pointer for %dth chunk: ", i);
-        // printf("%p\n", endPointersArray[i]);
-        // printf("\n");
-    // }
 }
-void freeInitialHeap(char *basePointer)
+void freeInitialHeap(int *basePointer)
 {
     free(basePointer);
     basePointer = NULL;
@@ -228,12 +256,12 @@ void takeProcessInput(Process *processes, int *numProcesses, int heapSize)
         }
     }
 }
-void resetIsUsed()
+void resetIsUsed(heapState *current)
 {
     for(int i = 0; i < NUMBER_OF_CHUNKS; i++)
-        isUsed[i] = 0;
+        current->isUsed[i] = 0;
 }
-void firstFit(Process process, int numProcesses, int *chunkSizes)
+void firstFit(Process process, int *chunkSizes, heapState current)
 {
     // dont need to check for process larger than chunk size as its being handled above
     int allocated = 0;      // flag to detemrine if the process was allocated or no
@@ -244,88 +272,106 @@ void firstFit(Process process, int numProcesses, int *chunkSizes)
         // p.chunk = i
         // spaceLeftInChunks[i]-=p.size
         // if the process requires space less than the entire chunk, set isused to 1
-       if(spaceLeftInChunks[i]>=process.size && process.size < chunkSizes[i])
+       if(current.spaceLeftInChunks[i]>=process.size && process.size < chunkSizes[i])
         {
             isUsed[i] = 1;
-            spaceLeftInChunks[i] -= process.size;
-            process.allocatedChunk = i;
+            current.spaceLeftInChunks[i] -= process.size;
+            process.firstChunk = i;
             allocated = 1;
-            printf("\nallocated to block %d\n", process.allocatedChunk);
-            processes[count].allocatedChunk = process.allocatedChunk; 
+            printf("\nFirst fit algorithm allocates this process to block %d\n", process.firstChunk);
+            processes[count].firstChunk = process.firstChunk; 
             // printf("%s allocated to chunk %d (size %d)\n", processes[i].name, i, chunkSizes[i]);
             break;
         } 
         // if the process requires the same amount of space as the entire chunk, set isused to 2
-        else if(spaceLeftInChunks[i] >= process.size && process.size == chunkSizes[i])
+        else if(current.spaceLeftInChunks[i] >= process.size && process.size == chunkSizes[i])
         {
             isUsed[i] = 2;
-            spaceLeftInChunks[i] -= process.size;
-            process.allocatedChunk = i;
-            printf("\nallocated to block %d\n", process.allocatedChunk);
-            processes[count].allocatedChunk = process.allocatedChunk; 
+            current.spaceLeftInChunks[i] -= process.size;
+            process.firstChunk = i;
+            printf("\nallocated to block %d\n", process.firstChunk);
+            processes[count].firstChunk = process.firstChunk; 
             allocated = 1;
             break;
         }
     }
     if(!allocated)
     {
-        printf("Process P%d could not be allocated, shortage of space ", process.id);
+        printf("\nProcess P%d could not be allocated, shortage of space\n", process.id);
     }
 }
-void bestFit(Process process, int numProcesses, int *chunkSizes)
+void bestFit(Process process, int *chunkSizes, heapState current)
 {
     int bestIndex = -1;
     int bestSize = INT_MAX;
     for(int i=0;i<NUMBER_OF_CHUNKS;i++)
     {
-        if(process.size <= spaceLeftInChunks[i] && process.size <= chunkSizes[i] && chunkSizes[i] < bestSize)
+        if(process.size <= current.spaceLeftInChunks[i] && process.size <= chunkSizes[i] && chunkSizes[i] < bestSize)
         {
-            bestSize = spaceLeftInChunks[i];
+            bestSize = current.spaceLeftInChunks[i];
             bestIndex = i;
         }
     }
     if(bestIndex != -1)
     {
-        process.allocatedChunk = bestIndex;
-        spaceLeftInChunks[bestIndex] -= process.size;
-        processes[count].allocatedChunk = process.allocatedChunk; 
-        printf("\nallocated to block %d\n", process.allocatedChunk);
+        process.bestChunk = bestIndex;
+        current.spaceLeftInChunks[bestIndex] -= process.size;
+        processes[count].bestChunk = process.bestChunk; 
+        printf("\nBest fit algorithm allocates this process to block %d\n", process.bestChunk);
     }
     else
     {
-        printf("Process P%d could not be allocated, shortage of space", process.id);
+        printf("\nProcess P%d could not be allocated, shortage of space\n", process.id);
     }
 }
-void worstFit(Process *processes, int numProcesses, int *chunkSizes)
+void worstFit(Process process, int *chunkSizes, heapState current)
 {
-    printf("\n\n\tWorst Fit Allocation\n");
-    resetIsUsed();
-
-    for(int i = 0; i < numProcesses; i++)
+    int worstIndex = -1;
+    int worstSize = -1;
+    for(int i=0;i<NUMBER_OF_CHUNKS;i++)
     {
-        if(processes[i].allocatedChunk == -2) continue;
-
-        int worstIndex = -1;
-        int worstSize = -1;
-        for(int j = 0; j < NUMBER_OF_CHUNKS; j++)
+        if(process.size <= current.spaceLeftInChunks[i] && process.size <= chunkSizes[i] && chunkSizes[i] > worstSize)
         {
-            if(isUsed[j] == 0 && processes[i].size <= chunkSizes[j] && chunkSizes[j] > worstSize)
-            {
-                worstSize = chunkSizes[j];
-                worstIndex = j;
-            }
-        }
-        if(worstIndex != -1)
-        {
-            isUsed[worstIndex] = 1;
-            processes[i].allocatedChunk = worstIndex;
-            printf("%s allocated to chunk %d (size %d)\n", processes[i].id, worstIndex, chunkSizes[worstIndex]);
-        }
-        else
-        {
-            printf("%s could not be allocated.\n", processes[i].id);
+            worstSize = current.spaceLeftInChunks[i];
+            worstIndex = i;
         }
     }
+    if(worstIndex != -1)
+    {
+        process.worstChunk = worstIndex;
+        current.spaceLeftInChunks[worstIndex] -= process.size;
+        processes[count].worstChunk = process.worstChunk; 
+        printf("\nWorst fit algorithm allocates this process to block%d\n", process.worstChunk);
+    }
+    else
+    {
+        printf("\nProcess P%d could not be allocated, shortage of space\n", process.id);
+    }
+    // for(int i = 0; i < numProcesses; i++)
+    // {
+    //     if(processes[i].allocatedChunk == -2) continue;
+
+    //     int worstIndex = -1;
+    //     int worstSize = -1;
+    //     for(int j = 0; j < NUMBER_OF_CHUNKS; j++)
+    //     {
+    //         if(isUsed[j] == 0 && processes[i].size <= chunkSizes[j] && chunkSizes[j] > worstSize)
+    //         {
+    //             worstSize = chunkSizes[j];
+    //             worstIndex = j;
+    //         }
+    //     }
+    //     if(worstIndex != -1)
+    //     {
+    //         isUsed[worstIndex] = 1;
+    //         processes[i].allocatedChunk = worstIndex;
+    //         printf("%s allocated to chunk %d (size %d)\n", processes[i].id, worstIndex, chunkSizes[worstIndex]);
+    //     }
+    //     else
+    //     {
+    //         printf("%s could not be allocated.\n", processes[i].id);
+    //     }
+    // }
 }
 float calculateUtilization(Process *processes, int numProcesses, int heapSize)
 {
@@ -341,41 +387,45 @@ float calculateUtilization(Process *processes, int numProcesses, int heapSize)
     printf("Memory Utilization: %.2f%%\n", utilization);
     return utilization;
 }
-
-
-void useFirstFit(Process process, int *chunkSizes)
+void useFirstFit(Process process, int *chunkSizes, heapState firstFitHeap)
 {
-    firstFit(process, 1, chunkSizes);
+    firstFit(process, chunkSizes, firstFitHeap);
 }
-void useBestFit(Process process, int *chunkSizes)
+void useBestFit(Process process, int *chunkSizes, heapState bestFitHeap)
 {
-    bestFit(process, 1, chunkSizes);
+    bestFit(process, chunkSizes, bestFitHeap);
 }
-void useWorstFit(Process process, int *chunkSizes)
+void useWorstFit(Process process, int *chunkSizes, heapState worstFitHeap)
 {
-    // call function here
+    worstFit(process, chunkSizes, worstFitHeap);
 }
-
-void customFree(int id)
+void customFree(int id, heapState *current)
 {
-    Process dummy;
+    Process *dummy;
+    dummy = &processes[id];
 
-    dummy.allocatedChunk = processes[id].allocatedChunk;
-    dummy.id = processes[id].id;
-    dummy.size = processes[id].size;
-
-    spaceLeftInChunks[dummy.allocatedChunk] += dummy.size;
-    dummy.allocatedChunk = -1;
-    dummy.id = -1;
-    dummy.size = -1;
+    current->spaceLeftInChunks[dummy->allocatedChunk] += dummy->size;
+    dummy->allocatedChunk = -1;
+    dummy->id = -1;
 }
-
-
-
-
-
-
-
+void initializeHeapStates(heapState *state, int *chunkSizes)
+{
+    state->isUsed = malloc(NUMBER_OF_CHUNKS * sizeof(int));
+    state->spaceLeftInChunks = malloc(NUMBER_OF_CHUNKS * sizeof(int));
+    for(int i=0;i<NUMBER_OF_CHUNKS; i++)
+    {
+        state->spaceLeftInChunks[i] = chunkSizes[i];
+    }
+}
+void displayChunks(heapState current)
+{   
+    printf("\n--------PRINTING THE SPACE LEFT IN CHUNKS FOR DEBUG---------\n");
+    for(int i=0;i<NUMBER_OF_CHUNKS;i++)
+    {
+        printf("\nspaceleftinchunks[%d]: %d", i, current.spaceLeftInChunks[i]);
+    }
+    printf("\n\n--------SPACE LEFT IN CHUNKS DONE---------\n\n");
+}
 
 // TODO: REWRITE THIS COMPARISON FUNCTION
 // void compareAlgorithms(Process *originalProcesses, int numProcesses, int *chunkSizes, int heapSize)
