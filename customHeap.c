@@ -3,20 +3,10 @@
 #include<string.h>
 #include<limits.h>
 #include<time.h>
+#include<windows.h>
 const int NUMBER_OF_CHUNKS = 9;
 const int MAX_PROCESSES = 100;
 
-int **basePointersArray;  // array of pointers that keeps track of the base pointer for each chunk
-int **endPointersArray;   // array of pointers that keeps track of the end pointer for each chunk 
-/*
-TODO
-1. calculate internal, external and total fragmentation for each algorithm
-2. write the process number(p0 would be 0) to the actual memory of the block it was assigned to
-3. write the answers to text files  
-4. make sure that freeing up rewrites the actual memory to be -1 or some other flag
-5. make sure that freeing up also rewrites the text files to be correct
-6. text files can be done last and if too complicated, just scrap it/do it in python/do it using ai
-*/
 // Process data type
 typedef struct {
     int id;
@@ -43,9 +33,8 @@ Memory *ffMemoryBlock, *bfMemoryBlock, *wfMemoryBlock;
 // the Process Name
 int count = -1;
 
-void split_chunks(int, int*);  // splits the initial heap into chunks
+long long nano_time();
 void freeInitialHeap(int*);    // frees up the initial allocated heap
-void processInput(Process *processes, int *processCount, int heapSize); // not used function delete if still not used at the end
 void resetIsUsed(heapState*); // resets the isused array for each heapstate
 float calculateUtilization(Process *processes, int numProcesses, int heapSize); // rewrite this function
 void compareAlgorithms(Process *originalProcesses, int numProcesses, int *chunkSizes, int heapSize);    // rewrite this function
@@ -63,38 +52,21 @@ void calculateFragmentation(heapState*, int*);
 void displayFragment(heapState);
 void assignData(Memory*, int, int*);
 void writeDataToFile(heapState, char*, Process*, Memory*, int );
-// min allocation 1024
-// 1048576   512k   256k    128k    64k     32k       
-// 1024  =   512     256     128     64      32      16      8       4       4
+void clearFile(char*, int, Memory*);
 
-// 1024 0-599, 600-799
 int main()
 {
     int n = 1024;
-
+    long long start, end;
+    long long firstTime, bestTime, worstTime;
     // allocating the initial heap
     int *basePointer = malloc((n * sizeof(int)));
-    // char *test = malloc(20);
-    // for(int i=0;i<10;i++)
-    // {
-    //     // printf("in loop\n");
-    //     sprintf(test , "%p",  (void*)(basePointer+i));
-    //     printf("%s\n", test);
-    // }
-    basePointersArray = malloc(NUMBER_OF_CHUNKS * sizeof(int*));
-    endPointersArray = malloc(NUMBER_OF_CHUNKS * sizeof(int*));
-    split_chunks(n, basePointer);
+
     Process p;
     processes = malloc(sizeof(Process) * MAX_PROCESSES);
-    // process input
-    // takeProcessInput(processes, &numProcesses, n);
-
     
     int chunkSizes[] = {n / 2, n/4, n/8, n/16, n/32, n/64, n/128, n/256, n/256};
-    
-
-    // compareAlgorithms(processes, numProcesses, chunkSizes, n);
-    
+        
     // heap state initialisation
     initializeHeapStates(&firstFitHeap, chunkSizes);
     initializeHeapStates(&bestFitHeap, chunkSizes);
@@ -110,13 +82,14 @@ int main()
         // choice for the user
         int choice, processNumber, processSize;
         printf("\n\n0 - Exit\n");
-        printf("1 - allocate process\n");
-        printf("2 - allocate n number of processes\n");
-        printf("3 - free up process\n");
-        printf("4 - View Process Details \n");
-        printf("5 - View Remaining Space and fragmentation \n");
-        printf("6 - View Time taken for each algorithm \n");
-        printf("7 - Write the data to Text File \n\n");
+        printf("1 - allocate a single process\n");
+        printf("2 - free up process\n");
+        printf("3 - View Process Details \n");
+        printf("4 - View Remaining Space and fragmentation \n");
+        printf("5 - View Time taken for each algorithm \n");
+        printf("6 - Write the data to Text File \n");
+        printf("7 - Reset Text File Data \n");
+        printf("8 - Time Taken by the algorithms \n\n");
         printf("Enter choice: ");
         scanf("%d", &choice);
         
@@ -155,12 +128,23 @@ int main()
                     break;
                 }
                 // allocate logic here, call the required functions
+                start = nano_time();
                 useFirstFit(p, chunkSizes, &firstFitHeap);
+                end = nano_time();
+                firstTime = end-start;
+
+                start = nano_time();
                 useBestFit(p, chunkSizes, &bestFitHeap);
+                end = nano_time();
+                bestTime = end-start;
+
+                start = nano_time();
                 useWorstFit(p, chunkSizes, &worstFitHeap);
+                end = nano_time();
+                worstTime = end - start;
                 break;
             // for freeing up the process
-            case 3:
+            case 2:
             {
                 printf("process number that is to be freed: ");
                 scanf("%d", &processNumber);
@@ -171,7 +155,7 @@ int main()
                 break;
             }
             // process details
-            case 4:
+            case 3:
             {
                 printf("\nProcess Details:\n");
                 for(int i=0;i<=count;i++)
@@ -192,7 +176,7 @@ int main()
                 break;
             }
             // space left in chunks + fragmentation
-            case 5:
+            case 4:
             {
                 calculateFragmentation(&firstFitHeap, chunkSizes);
                 calculateFragmentation(&bestFitHeap, chunkSizes);
@@ -205,12 +189,12 @@ int main()
                 displayChunks(worstFitHeap);
                 break;
             }
-            case 6:
+            case 5:
             {
                 assignData(bfMemoryBlock, 1, chunkSizes);
                 break;
             }
-            case 7:
+            case 6:
             {
                 assignData(ffMemoryBlock, 0, chunkSizes);
                 writeDataToFile(firstFitHeap, "first.txt", processes, ffMemoryBlock, n);
@@ -222,26 +206,17 @@ int main()
                 writeDataToFile(worstFitHeap, "worst.txt", processes, wfMemoryBlock, n);
                 break;
             }
-            case 10:
-                split_chunks(n, basePointer);
+            case 7:
+                clearFile("first.txt", n, ffMemoryBlock);
+                clearFile("best.txt", n, bfMemoryBlock);
+                clearFile("worst.txt", n, wfMemoryBlock);
                 break;
-            case 100:
+            case 8:
             {
-                for(int i=0;i<=count;i++)
-                {
-                    printf("\n\nid: %d", processes[i].id);
-                    printf("\nAllocated Chunks of this process\n");
-                    printf("Best Chunk: %d\n", processes[i].bestChunk);
-                    printf("First Chunk: %d\n", processes[i].firstChunk);
-                    printf("Worst Chunk: %d\n", processes[i].worstChunk);
-                    printf("\nsize: %d", processes[i].size);
-                    printf("\n\n");
-                }
-                break;
-            }
-            case 101:
-            {
-                displayFragment(firstFitHeap);
+                printf("Time measured in nanoseconds\n");
+                printf("first fit algorithm time: %d\n", firstTime);
+                printf("best fit algorithm time: %d\n", bestTime);
+                printf("worst fit algorithm time: %d\n", worstTime);
                 break;
             }
             default:
@@ -254,53 +229,13 @@ int main()
     // cleanup
     freeInitialHeap(basePointer);
     // free(isUsed);
-    free(basePointersArray);
-    free(endPointersArray);
-}
-void split_chunks(int heapSize, int *basePointer)
-{
-    // if for example heapSize is 1024 then chunk sizes would be
-    // 1024  =   512     256     128     64      32      16      8       4       4
-    // using array so irrespective of user input for heap size it would still give valid chunk addresses
-    int sizes[] = {heapSize / 2, heapSize/4, heapSize/8, heapSize/16, heapSize/32, heapSize/64, heapSize/128, heapSize/256, heapSize/256};
-    // chunk 1 addresses
-    basePointersArray[0] = basePointer;
-    endPointersArray[0] = basePointer + (sizes[0] - 1);
-    // printf("chunk 1 end pointer: %p\n", endPointersArray[0]);
 
-    // assigning chunks 2-9 addresses
-    for(int i=1;i<NUMBER_OF_CHUNKS;i++)
-    {
-        basePointersArray[i] = endPointersArray[i-1] + 1;
-        endPointersArray[i] = basePointersArray[i] + (sizes[i] - 1);
-    }
 }
+
 void freeInitialHeap(int *basePointer)
 {
     free(basePointer);
     basePointer = NULL;
-}
-void takeProcessInput(int *numProcesses, int heapSize)
-{
-    printf("Enter number of processes: ");
-    scanf("%d", numProcesses);
-
-    for(int i = 0; i < *numProcesses; i++)
-    {
-        // sprintf(processes[i].name, "p%d", i);
-        // printf("Enter size for %s: ", processes[i].name);
-        scanf("%d", &processes[i].size);
-
-        if(processes[i].size > heapSize / 2)
-        {
-            // printf("%s too large to fit in memory (greater than half of heap size)\n", processes[i].name);
-            processes[i].allocatedChunk = -2; // mark the process as too large  
-        }
-        else    
-        {
-            processes[i].allocatedChunk = -1; // not yet allocated
-        }
-    }
 }
 void resetIsUsed(heapState *current)
 {
@@ -631,4 +566,23 @@ void initializeMemoryBlocks(Memory **current, int size, int *basepointer)
         (*current)[i].address = malloc(32);
         sprintf((*current)[i].address, "%p", (void*)(basepointer+i));
     }
+}
+void clearFile(char *filename, int size, Memory *current)
+{
+    FILE *fp = fopen(filename, "w");
+    for(int i = 0;i<size;i++)
+    {
+        char *line = malloc(50);
+        sprintf(line, "%s -> -1\n" , current[i].address, current[i].data);
+        fputs(line, fp);
+        free(line);
+    }
+    fclose(fp);
+}
+long long nano_time()
+{
+    LARGE_INTEGER freq, t;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&t);
+    return (long long)( (1e9 * t.QuadPart) / freq.QuadPart );
 }
