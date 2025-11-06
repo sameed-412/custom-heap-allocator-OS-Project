@@ -82,11 +82,11 @@ int main()
         // choice for the user
         int choice, processNumber, processSize;
         printf("\n\n0 - Exit\n");
+        printf("5 - Help \n");
         printf("1 - allocate a single process\n");
         printf("2 - free up process\n");
         printf("3 - View Process Details \n");
         printf("4 - View Remaining Space and fragmentation \n");
-        printf("5 - View Time taken for each algorithm \n");
         printf("6 - Write the data to Text File \n");
         printf("7 - Reset Text File Data \n");
         printf("8 - Time Taken by the algorithms \n\n");
@@ -191,7 +191,13 @@ int main()
             }
             case 5:
             {
-                assignData(bfMemoryBlock, 1, chunkSizes);
+                printf("\n Total Heap size: %d", n);
+                printf("\n Number of chunks: %d", NUMBER_OF_CHUNKS);
+                printf("\nChunks are numbered 0-8");
+                for(int i=0;i<NUMBER_OF_CHUNKS;i++)
+                {
+                    printf("\nChunk %d Space: %d", i, chunkSizes[i]);
+                }
                 break;
             }
             case 6:
@@ -349,31 +355,6 @@ void worstFit(Process process, int *chunkSizes, heapState *current)
     {
         printf("\nProcess P%d could not be allocated, shortage of space\n", process.id);
     }
-    // for(int i = 0; i < numProcesses; i++)
-    // {
-    //     if(processes[i].allocatedChunk == -2) continue;
-
-    //     int worstIndex = -1;
-    //     int worstSize = -1;
-    //     for(int j = 0; j < NUMBER_OF_CHUNKS; j++)
-    //     {
-    //         if(isUsed[j] == 0 && processes[i].size <= chunkSizes[j] && chunkSizes[j] > worstSize)
-    //         {
-    //             worstSize = chunkSizes[j];
-    //             worstIndex = j;
-    //         }
-    //     }
-    //     if(worstIndex != -1)
-    //     {
-    //         isUsed[worstIndex] = 1;
-    //         processes[i].allocatedChunk = worstIndex;
-    //         printf("%s allocated to chunk %d (size %d)\n", processes[i].id, worstIndex, chunkSizes[worstIndex]);
-    //     }
-    //     else
-    //     {
-    //         printf("%s could not be allocated.\n", processes[i].id);
-    //     }
-    // }
 }
 float calculateUtilization(Process *processes, int numProcesses, int heapSize)
 {
